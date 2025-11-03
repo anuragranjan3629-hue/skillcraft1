@@ -1,0 +1,579 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SkillCraft Stopwatch — Start / Pause / Reset / Laps</title>
+  <style>
+    :root{
+      --bg: #071022;
+      --panel: #0b1220;
+      --muted: #9fb0c8;
+      --accent: #06b6d4;
+      --accent-2: #7c3aed;
+      --success: #10b981;
+      --danger: #ef4444;
+      --glass: rgba(255,255,255,0.03);
+      --radius: 12px;
+      --max-width: 920px;
+      --ease: cubic-bezier(.2,.9,.2,1);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,Segoe UI,Roboto,Arial;
+      background: linear-gradient(180deg,var(--bg),#03101a 100%);
+      color:#e9f2ff;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:28px;
+    }
+
+    .app{
+      width:100%;
+      max-width:var(--max-width);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:16px;
+      padding:22px;
+      box-shadow: 0 18px 60px rgba(2,6,23,0.6);
+      display:grid;
+      grid-template-columns: 1fr 380px;
+      gap:18px;
+    }
+
+    @media (max-width:980px){
+      .app{ grid-template-columns: 1fr; padding:16px; }
+    }
+
+    header{
+      grid-column:1/-1;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:6px;
+    }
+    .brand{ display:flex; gap:12px; align-items:center }
+    .logo{ width:56px; height:56px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-weight:800; color:#001219; background: linear-gradient(90deg,var(--accent),var(--accent-2)); }
+    h1{ margin:0; font-size:18px }
+    .lead{ margin:0; color:var(--muted); font-size:13px }
+
+    /* Left: stopwatch display and controls */
+    .left{
+      padding:18px;
+      border-radius:12px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
+      border:1px solid rgba(255,255,255,0.02);
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .display{
+      font-size:64px;
+      font-weight:800;
+      letter-spacing: -1px;
+      color: #eaf6ff;
+      padding:8px 14px;
+      border-radius:10px;
+      min-width:320px;
+      text-align:center;
+      background: linear-gradient(90deg, rgba(6,182,212,0.03), rgba(124,58,237,0.02));
+      border:1px solid rgba(255,255,255,0.02);
+      box-shadow: inset 0 -8px 24px rgba(0,0,0,0.25);
+    }
+    @media (max-width:480px){ .display{ font-size:42px; min-width:unset; } }
+
+    .subdisplay{ font-size:14px; color:var(--muted) }
+
+    .controls{
+      display:flex;
+      gap:12px;
+      align-items:center;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      padding:10px 14px;
+      border-radius:10px;
+      border:none;
+      cursor:pointer;
+      font-weight:700;
+      background:var(--glass);
+      color:inherit;
+      min-width:110px;
+      transition: transform .14s var(--ease), box-shadow .14s var(--ease);
+      border:1px solid rgba(255,255,255,0.02);
+    }
+    .btn:active{ transform: translateY(2px) }
+    .btn.primary{ background:linear-gradient(90deg,var(--accent),var(--accent-2)); color:#001219; box-shadow: 0 10px 30px rgba(6,182,212,0.08); }
+    .btn.ghost{ background:transparent; border:1px solid rgba(255,255,255,0.04); color:var(--muted); }
+    .btn.warn{ background:linear-gradient(90deg,#f59e0b,#f97316); color:#001219; }
+
+    .kbd{
+      display:inline-block;
+      padding:4px 8px;
+      border-radius:6px;
+      background:rgba(255,255,255,0.03);
+      font-weight:700;
+      font-size:12px;
+      color:var(--muted);
+      border:1px solid rgba(255,255,255,0.02);
+    }
+
+    /* Right panel: laps and settings */
+    .right{
+      padding:18px;
+      border-radius:12px;
+      background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
+      border:1px solid rgba(255,255,255,0.02);
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      max-height:72vh;
+      overflow:auto;
+    }
+
+    .panel-title{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .panel-title h3{ margin:0; font-size:15px }
+    .muted{ color:var(--muted); font-size:13px }
+
+    .laps{ display:flex; flex-direction:column; gap:8px; margin-top:6px; }
+    .lap{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+      padding:8px;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.02);
+      background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
+    }
+    .lap strong{ font-size:14px }
+    .lap .meta{ color:var(--muted); font-size:13px }
+
+    .big-muted{ color:var(--muted); font-weight:700; font-size:13px }
+
+    .empty{ text-align:center; color:var(--muted); padding:12px; border-radius:8px; border:1px dashed rgba(255,255,255,0.02); }
+
+    footer.app-footer{
+      grid-column:1/-1;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      margin-top:6px;
+    }
+
+    /* small screen tweaks */
+    @media (max-width:980px){
+      .right{ max-height:unset; }
+      footer.app-footer{ flex-direction:column; align-items:flex-start; gap:8px; }
+    }
+
+    /* highlight running state */
+    .running .display{ box-shadow: 0 18px 50px rgba(6,182,212,0.06); transform: translateY(-2px); }
+
+    /* nice small animation for lap flashing */
+    .flash {
+      animation: flashbg 700ms ease;
+    }
+    @keyframes flashbg{
+      0%{ background: linear-gradient(90deg, rgba(6,182,212,0.14), rgba(124,58,237,0.06)); }
+      100%{ background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005)); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <header>
+      <div class="brand"><div class="logo">SC</div><div><h1>SkillCraft Stopwatch</h1><div class="lead">Start • Pause • Reset • Lap • Export</div></div></div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div class="muted">Shortcuts: <span class="kbd">Space</span> start/pause • <span class="kbd">L</span> lap • <span class="kbd">R</span> reset</div>
+        <button id="themeToggle" class="btn ghost" title="Toggle light/dark">Toggle Theme</button>
+      </div>
+    </header>
+
+    <section class="left" aria-label="Stopwatch controls">
+      <div id="displayWrap" class="">
+        <div id="timeDisplay" class="display" aria-live="polite">00:00:00.000</div>
+        <div class="subdisplay muted" id="statusDisplay">Stopped</div>
+      </div>
+
+      <div class="controls" role="toolbar" aria-label="Stopwatch controls">
+        <button id="startBtn" class="btn primary" aria-pressed="false">Start</button>
+        <button id="lapBtn" class="btn ghost" title="Record lap (disabled when stopped)">Lap</button>
+        <button id="pauseBtn" class="btn" style="display:none">Pause</button>
+        <button id="resetBtn" class="btn" title="Reset stopwatch (double confirmation)">Reset</button>
+        <button id="exportBtn" class="btn">Export CSV</button>
+      </div>
+    </section>
+
+    <aside class="right" aria-label="Laps & settings">
+      <div class="panel-title"><h3>Laps</h3><div class="muted" id="lapsCount">0</div></div>
+
+      <div id="laps" class="laps" aria-live="polite">
+        <div class="empty">No laps yet. Press <strong>Lap</strong> while running to record times.</div>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button id="clearLaps" class="btn">Clear Laps</button>
+        <button id="saveBtn" class="btn ghost">Save</button>
+        <button id="loadBtn" class="btn ghost">Load</button>
+      </div>
+
+      <div style="margin-top:10px">
+        <div class="panel-title"><h3>Session</h3><div class="muted" id="sessionDuration">00:00:00.000</div></div>
+        <div class="muted">Session keeps running time in memory and can be saved to browser storage. Reloading the page will restore the last saved session if you used Save.</div>
+      </div>
+    </aside>
+
+    <footer class="app-footer">
+      <div class="muted">© <span id="year"></span> SkillCraft Technology</div>
+      <div class="muted">Precision: milliseconds • Laps exportable as CSV</div>
+    </footer>
+  </div>
+
+  <script>
+    /* SkillCraft Stopwatch — long version
+       - start/pause/reset
+       - lap times (lap duration & split)
+       - export laps as CSV
+       - save/load to localStorage
+       - keyboard shortcuts and responsive UI
+    */
+
+    (function(){
+      // DOM
+      const timeDisplay = document.getElementById('timeDisplay');
+      const statusDisplay = document.getElementById('statusDisplay');
+      const startBtn = document.getElementById('startBtn');
+      const pauseBtn = document.getElementById('pauseBtn');
+      const lapBtn = document.getElementById('lapBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const exportBtn = document.getElementById('exportBtn');
+      const clearLapsBtn = document.getElementById('clearLaps');
+      const saveBtn = document.getElementById('saveBtn');
+      const loadBtn = document.getElementById('loadBtn');
+      const lapsEl = document.getElementById('laps');
+      const lapsCountEl = document.getElementById('lapsCount');
+      const sessionDurationEl = document.getElementById('sessionDuration');
+      const themeToggle = document.getElementById('themeToggle');
+      const appEl = document.getElementById('app');
+      const yearEl = document.getElementById('year');
+
+      yearEl.textContent = new Date().getFullYear();
+
+      // State
+      const STORAGE_KEY = 'skillcraft_stopwatch_v1';
+      let running = false;
+      let startTime = null;       // timestamp when started (ms)
+      let elapsedBefore = 0;      // ms elapsed before last start (to support resume)
+      let rafId = null;           // requestAnimationFrame id
+      let laps = [];              // array of {id, lapNumber, lapTimeMs, splitMs, timestamp}
+      let lastLapTime = 0;
+      let sessionStart = null;    // timestamp for session start (for sessionDuration)
+
+      // Utility
+      const uid = (p='id') => p + '_' + Math.random().toString(36).slice(2,9);
+      const formatTime = (ms) => {
+        // ms is integer milliseconds
+        const milliseconds = ms % 1000;
+        const totalSeconds = Math.floor(ms / 1000);
+        const seconds = totalSeconds % 60;
+        const totalMinutes = Math.floor(totalSeconds / 60);
+        const minutes = totalMinutes % 60;
+        const hours = Math.floor(totalMinutes / 60);
+        return `${String(hours).padStart(2,'0')}:${String(minutes).padStart(2,'0')}:${String(seconds).padStart(2,'0')}.${String(milliseconds).padStart(3,'0')}`;
+      };
+
+      function updateDisplay(nowMs){
+        const elapsed = (nowMs - startTime) + elapsedBefore;
+        timeDisplay.textContent = formatTime(elapsed);
+        sessionDurationEl.textContent = formatTime((sessionStart ? (nowMs - sessionStart) : elapsed));
+      }
+
+      // Tick loop via requestAnimationFrame
+      function tick(){
+        const now = performance.now();
+        updateDisplay(now);
+        rafId = requestAnimationFrame(tick);
+      }
+
+      // Start / Resume
+      function start(){
+        if(running) return;
+        running = true;
+        startBtn.textContent = 'Running';
+        startBtn.classList.add('primary');
+        startBtn.setAttribute('aria-pressed','true');
+        statusDisplay.textContent = 'Running';
+        startTime = performance.now();
+        if(!sessionStart) sessionStart = Date.now();
+        // begin animation loop
+        rafId = requestAnimationFrame(tick);
+        // enable lap
+        lapBtn.disabled = false;
+        appEl.classList.add('running');
+        saveAuto(); // autosave start
+      }
+
+      // Pause
+      function pause(){
+        if(!running) return;
+        running = false;
+        cancelAnimationFrame(rafId);
+        rafId = null;
+        // compute elapsedBefore
+        const now = performance.now();
+        elapsedBefore += (now - startTime);
+        startTime = null;
+        startBtn.textContent = 'Resume';
+        startBtn.classList.remove('primary');
+        startBtn.setAttribute('aria-pressed','false');
+        statusDisplay.textContent = 'Paused';
+        lapBtn.disabled = true;
+        appEl.classList.remove('running');
+        saveAuto(); // autosave pause
+      }
+
+      // Reset — clears time and laps. Confirm before clearing if running.
+      function reset(){
+        if(running){
+          if(!confirm('Stop and reset stopwatch?')) return;
+        } else {
+          if(!confirm('Reset stopwatch and clear laps?')) return;
+        }
+        // stop and clear
+        if(running) pause();
+        elapsedBefore = 0;
+        startTime = null;
+        rafId = null;
+        running = false;
+        laps = [];
+        lastLapTime = 0;
+        sessionStart = null;
+        timeDisplay.textContent = '00:00:00.000';
+        statusDisplay.textContent = 'Stopped';
+        renderLaps();
+        saveAuto();
+      }
+
+      // Lap — record lap time and split
+      function lap(){
+        // if not running, ignore or treat as soft lap? We'll ignore
+        if(!running) return;
+        const nowPerf = performance.now();
+        const elapsed = (nowPerf - startTime) + elapsedBefore;
+        const lapMs = elapsed - lastLapTime;
+        const splitMs = elapsed;
+        lastLapTime = elapsed;
+        const lapObj = { id: uid('lap'), lapNumber: laps.length + 1, lapTimeMs: Math.round(lapMs), splitMs: Math.round(splitMs), timestamp: new Date().toISOString() };
+        laps.unshift(lapObj); // newest first
+        renderLaps(true);
+        saveAuto();
+      }
+
+      // Render laps list
+      function renderLaps(flashNew = false){
+        lapsEl.innerHTML = '';
+        if(laps.length === 0){
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          empty.textContent = 'No laps recorded. Press Lap while running to record laps.';
+          lapsEl.appendChild(empty);
+        } else {
+          laps.forEach((lp, idx) => {
+            const div = document.createElement('div');
+            div.className = 'lap';
+            // lap number and lap time
+            div.innerHTML = `<div><strong>Lap ${lp.lapNumber}</strong><div class="meta">${new Date(lp.timestamp).toLocaleString()}</div></div><div style="text-align:right"><div><strong>${formatTime(lp.lapTimeMs)}</strong></div><div class="meta">Split: ${formatTime(lp.splitMs)}</div></div>`;
+            lapsEl.appendChild(div);
+            if(flashNew && idx === 0){
+              div.classList.add('flash');
+              setTimeout(()=> div.classList.remove('flash'), 900);
+            }
+          });
+        }
+        lapsCountEl.textContent = String(laps.length);
+      }
+
+      // Export laps as CSV: columns: lapNumber, lapTime(ms), split(ms), lapTimeHuman, splitHuman, timestamp
+      function exportCSV(){
+        if(laps.length === 0){ alert('No laps to export'); return; }
+        const rows = [['Lap','LapMs','SplitMs','Lap','Split','Timestamp']];
+        // export oldest first for natural reading
+        const data = [...laps].reverse();
+        data.forEach(d => {
+          rows.push([ d.lapNumber, d.lapTimeMs, d.splitMs, formatTime(d.lapTimeMs), formatTime(d.splitMs), d.timestamp ]);
+        });
+        const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `stopwatch_laps_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.csv`;
+        document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      }
+
+      // Save & load to localStorage
+      function saveAuto(){
+        const store = {
+          running,
+          elapsedBefore,
+          laps,
+          lastLapTime,
+          sessionStart,
+          savedAt: new Date().toISOString()
+        };
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+        } catch(e){ console.warn('Save failed', e); }
+      }
+
+      function saveManual(){
+        saveAuto();
+        alert('Session saved to browser storage.');
+      }
+
+      function loadSaved(){
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(!raw) return alert('No saved session found');
+        try {
+          const obj = JSON.parse(raw);
+          // restore state but not auto-start the run (we'll leave paused)
+          elapsedBefore = obj.elapsedBefore || 0;
+          laps = obj.laps || [];
+          lastLapTime = obj.lastLapTime || 0;
+          sessionStart = obj.sessionStart || null;
+          // if saved as running, we won't auto resume to avoid surprise; user can press Start to continue
+          running = false;
+          startBtn.textContent = 'Start';
+          startBtn.classList.remove('primary');
+          statusDisplay.textContent = 'Loaded (paused)';
+          timeDisplay.textContent = formatTime(elapsedBefore);
+          renderLaps();
+          saveAuto();
+        } catch(e){ alert('Failed to load saved session: ' + e.message); }
+      }
+
+      function clearSaved(){
+        localStorage.removeItem(STORAGE_KEY);
+        alert('Saved session cleared');
+      }
+
+      // Buttons wiring
+      startBtn.addEventListener('click', ()=> {
+        if(!running) start(); else { /* defensive */ }
+      });
+
+      pauseBtn.addEventListener('click', ()=> { if(running) pause(); });
+
+      // Also clicking the same start button toggles start/pause: we will support keyboard toggles; but keep explicit pause button hidden (we use start btn text to show resume)
+      startBtn.addEventListener('dblclick', () => {
+        // double-click toggles pause if running
+        if(running) pause();
+      });
+
+      // For ease: make Start button toggle behavior on single click when running => pause
+      // Replace previous event: add a toggle
+      startBtn.removeEventListener('click', ()=>{});
+      startBtn.addEventListener('click', ()=> {
+        if(!running) start(); else pause();
+      });
+
+      lapBtn.addEventListener('click', lap);
+      resetBtn.addEventListener('click', reset);
+      exportBtn.addEventListener('click', exportCSV);
+      clearLapsBtn.addEventListener('click', ()=> {
+        if(!confirm('Clear all laps?')) return;
+        laps = []; lastLapTime = 0;
+        renderLaps();
+        saveAuto();
+      });
+      saveBtn.addEventListener('click', saveManual);
+      loadBtn.addEventListener('click', loadSaved);
+
+      // Keyboard shortcuts: Space = start/pause, L = lap, R = reset
+      window.addEventListener('keydown', (e) => {
+        // don't intercept when typing in inputs (not present here but safe)
+        const tag = (e.target && e.target.tagName) || '';
+        if(tag === 'INPUT' || tag === 'TEXTAREA') return;
+        if(e.code === 'Space'){
+          e.preventDefault();
+          if(!running) start(); else pause();
+        } else if(e.key.toLowerCase() === 'l'){
+          e.preventDefault();
+          lap();
+        } else if(e.key.toLowerCase() === 'r'){
+          e.preventDefault();
+          reset();
+        }
+      });
+
+      // Theme toggle (light/dark) — simple toggling of CSS variables
+      let lightMode = false;
+      themeToggle.addEventListener('click', ()=> {
+        lightMode = !lightMode;
+        if(lightMode){
+          document.documentElement.style.setProperty('--bg','#f6f9fc');
+          document.documentElement.style.setProperty('--panel','#ffffff');
+          document.documentElement.style.setProperty('--muted','#4b5563');
+          document.documentElement.style.setProperty('--accent','#06b6d4');
+          document.documentElement.style.setProperty('--accent-2','#7c3aed');
+          document.documentElement.style.setProperty('color-scheme','light');
+        } else {
+          document.documentElement.style.removeProperty('--bg');
+          document.documentElement.style.removeProperty('--panel');
+          document.documentElement.style.removeProperty('--muted');
+          document.documentElement.style.removeProperty('--accent');
+          document.documentElement.style.removeProperty('--accent-2');
+          document.documentElement.style.removeProperty('color-scheme');
+        }
+      });
+
+      // Render initialization
+      function init(){
+        // load buffered saved session if present but don't auto-start
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if(saved){
+          try {
+            const obj = JSON.parse(saved);
+            elapsedBefore = obj.elapsedBefore || 0;
+            laps = obj.laps || [];
+            lastLapTime = obj.lastLapTime || 0;
+            sessionStart = obj.sessionStart || null;
+            timeDisplay.textContent = formatTime(elapsedBefore);
+            renderLaps();
+          } catch(e){ console.warn('Failed to restore', e); }
+        } else {
+          timeDisplay.textContent = '00:00:00.000';
+        }
+        // Ensure lap button disabled initially
+        lapBtn.disabled = true;
+        // If storage contains running:true, we still require user to hit start to resume
+      }
+
+      init();
+
+      // Accessibility: ARIA live for status and update
+      // Save on unload
+      window.addEventListener('beforeunload', () => {
+        saveAuto();
+      });
+
+      // Expose to console for debugging
+      window.SC_STOPWATCH = {
+        start, pause, reset, lap, exportCSV, saveAuto, loadSaved, clearSaved, getState: () => ({ running, elapsedBefore, laps, lastLapTime, sessionStart })
+      };
+    })();
+  </script>
+</body>
+</html>
