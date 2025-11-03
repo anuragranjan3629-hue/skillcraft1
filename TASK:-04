@@ -1,0 +1,551 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>SkillCraft To‑Do App — Big Version</title>
+  <style>
+    /* ======== Clean, modern styling ======== */
+    :root{
+      --bg:#0f1724; --panel:#071022; --muted:#9fb0c8; --accent:#06b6d4; --card:#0b1220; --success:#10b981;
+      --danger:#ef4444; --glass: rgba(255,255,255,0.03);
+      --radius:12px; --gap:12px; --max-width:1100px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;background:linear-gradient(180deg,var(--bg),#071022 80%);font-family:Inter,system-ui,Segoe UI,Roboto,Arial;color:#e6eef8}
+    .wrap{width:100%;max-width:var(--max-width);margin:28px auto;padding:18px;}
+    .app{display:grid;grid-template-columns:320px 1fr;gap:18px}
+    @media (max-width:880px){.app{grid-template-columns:1fr} .left{order:2}}/* Header */
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;font-weight:700;color:#001219}
+h1{margin:0;font-size:18px}
+p.lead{margin:0;color:var(--muted);font-size:13px}
+
+/* Left: Lists + controls */
+.left{background:linear-gradient(180deg,var(--card), #071021);padding:12px;border-radius:var(--radius);display:flex;flex-direction:column;gap:12px}
+.lists{display:flex;flex-direction:column;gap:8px}
+.list-item{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;cursor:pointer;border:1px solid rgba(255,255,255,0.02)}
+.list-item.active{background:linear-gradient(90deg,var(--accent),#7c3aed);color:#001219;transform:translateY(-2px)}
+.list-item .meta{font-size:12px;color:var(--muted)}
+.add-list{display:flex;gap:8px}
+input, select, textarea, button{font-family:inherit}
+
+/* Right: Board */
+.right{display:flex;flex-direction:column;gap:12px}
+.panel{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,0.02)}
+
+/* Task composer */
+.composer{display:grid;grid-template-columns:1fr 200px;gap:8px}
+@media (max-width:880px){.composer{grid-template-columns:1fr}}
+.composer input[type='text']{padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+.composer .meta-controls{display:flex;flex-direction:column;gap:8px}
+.composer .meta-controls input,.composer .meta-controls select{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+.composer .actions{display:flex;gap:8px}
+button.primary{background:linear-gradient(90deg,var(--accent),#7c3aed);border:none;padding:10px 12px;border-radius:8px;color:#001219;cursor:pointer}
+
+/* Task list */
+.tasks{display:flex;flex-direction:column;gap:10px}
+.task{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);background:transparent}
+.task.dragging{opacity:0.7;transform:scale(0.995)}
+.checkbox{width:20px;height:20px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.task .title{font-weight:600}
+.task .meta{font-size:12px;color:var(--muted)}
+.task.completed{opacity:0.6;text-decoration:line-through}
+.task .actions{display:flex;gap:6px;align-items:center}
+.pill{padding:6px 8px;border-radius:8px;font-size:12px;border:1px solid rgba(255,255,255,0.03)}
+
+/* footer controls */
+.filters{display:flex;gap:8px;align-items:center}
+.search{padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent}
+
+/* small helpers */
+.muted{color:var(--muted)}
+.small{font-size:12px;color:var(--muted)}
+.spacer{height:8px}
+
+/* responsive adjustments */
+@media (max-width:540px){.task{grid-template-columns:auto 1fr}}
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="logo">SC</div>
+        <div>
+          <h1>SkillCraft To‑Do App</h1>
+          <p class="lead">Add tasks, organize in lists, set date/time, edit, reorder & save locally</p>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="exportBtn" class="primary" title="Export lists & tasks as JSON">Export</button>
+        <input id="importFile" type="file" accept="application/json" style="display:none" />
+        <button id="importBtn">Import</button>
+      </div>
+    </header><main class="app" role="main">
+  <section class="left" aria-label="Lists">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <strong>Lists</strong>
+        <small class="muted">Organize your tasks</small>
+      </div>
+      <div class="spacer"></div>
+      <div class="lists" id="lists"></div>
+      <div class="spacer"></div>
+      <div style="display:flex;gap:8px">
+        <input id="newListName" placeholder="New list name" />
+        <button id="addListBtn">Add</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <strong>Quick Actions</strong>
+      <div class="spacer"></div>
+      <button id="clearCompleted">Clear Completed in Current List</button>
+      <div style="height:8px"></div>
+      <button id="clearAll">Clear All Tasks (All Lists)</button>
+    </div>
+
+    <div class="panel small">
+      <div><strong>Storage</strong></div>
+      <div class="small">Data is saved locally in your browser via <code>localStorage</code>. Use Export/Import to move data between devices.</div>
+    </div>
+  </section>
+
+  <section class="right">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <strong id="currentListTitle">(No list)</strong>
+          <div class="small" id="currentListMeta">Select or create a list to start</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="search" class="search" placeholder="Search tasks..." />
+          <select id="filterStatus">
+            <option value="all">All</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="overdue">Overdue</option>
+          </select>
+          <select id="sortBy">
+            <option value="custom">Custom (manual)</option>
+            <option value="dateAsc">Due date ↑</option>
+            <option value="dateDesc">Due date ↓</option>
+            <option value="priority">Priority</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+
+      <form id="composer" class="composer" onsubmit="return false;" aria-label="Add new task">
+        <input id="taskTitle" type="text" placeholder="Task title (required)" required />
+        <div class="meta-controls">
+          <input id="taskDue" type="datetime-local" />
+          <select id="taskPriority">
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+          <div class="actions">
+            <button id="addTaskBtn" class="primary">Add Task</button>
+            <button id="clearComposer">Clear</button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div id="tasksContainer" class="tasks" aria-live="polite"></div>
+      <div class="spacer"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div class="small" id="tasksCount">0 tasks</div>
+        <div class="filters">
+          <button id="selectAll">Select/Deselect All</button>
+          <button id="markAllCompleted">Mark All Completed</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel small">
+      <strong>Tips</strong>
+      <ul>
+        <li>Double-click a task title to edit it.</li>
+        <li>Drag tasks to reorder them (manual order saved).</li>
+        <li>Due date triggers an overdue label. Allow notifications to receive reminders.</li>
+      </ul>
+      <div style="height:8px"></div>
+      <button id="requestNotify">Enable Reminders (Notifications)</button>
+    </div>
+  </section>
+</main>
+
+  </div>  <script>
+    /* =====================
+       Big To-Do App Script
+       - Multiple lists
+       - Add / Edit / Delete / Complete
+       - Due date & time, priority
+       - Manual drag-and-drop ordering
+       - Filters, search, sort
+       - Persistence via localStorage
+       - Export/Import JSON
+       - Optional browser notifications for reminders
+       ===================== */
+
+    (function(){
+      // ---------- Data model & persistence ----------
+      const STORAGE_KEY = 'skillcraft_todo_v1';
+
+      // app state
+      const state = {
+        lists: [], // array of {id, name, tasks: [task], createdAt}
+        activeListId: null,
+        filter: 'all',
+        search: '',
+        sortBy: 'custom'
+      };
+
+      // Task structure:
+      // { id, title, completed:false, due: ISO string or null, priority:'low'|'medium'|'high', createdAt, order }
+
+      // ---------- Helpers ----------
+      const $ = sel => document.querySelector(sel);
+      const $$ = sel => Array.from(document.querySelectorAll(sel));
+      const uid = (prefix='id') => prefix + '_' + Math.random().toString(36).slice(2,9);
+
+      function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+      function load(){
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if(raw){
+          try{ const parsed = JSON.parse(raw); Object.assign(state, parsed); return true; } catch(e){ console.error('Failed to parse storage', e); }
+        }
+        return false;
+      }
+
+      // initialize default data if none
+      function ensureDefault(){
+        if(!state.lists || state.lists.length === 0){
+          const inboxId = uid('list');
+          state.lists = [ { id: inboxId, name: 'Inbox', tasks: [], createdAt: new Date().toISOString() } ];
+          state.activeListId = inboxId;
+          save();
+        }
+      }
+
+      function getActiveList(){ return state.lists.find(l=>l.id === state.activeListId) || null; }
+
+      // ---------- UI refs ----------
+      const listsEl = $('#lists');
+      const currentListTitle = $('#currentListTitle');
+      const currentListMeta = $('#currentListMeta');
+      const newListName = $('#newListName');
+      const addListBtn = $('#addListBtn');
+      const tasksContainer = $('#tasksContainer');
+      const taskTitle = $('#taskTitle');
+      const taskDue = $('#taskDue');
+      const taskPriority = $('#taskPriority');
+      const addTaskBtn = $('#addTaskBtn');
+      const clearComposer = $('#clearComposer');
+      const tasksCount = $('#tasksCount');
+      const filterStatus = $('#filterStatus');
+      const searchInput = $('#search');
+      const sortBy = $('#sortBy');
+      const exportBtn = $('#exportBtn');
+      const importBtn = $('#importBtn');
+      const importFile = $('#importFile');
+      const clearCompletedBtn = $('#clearCompleted');
+      const clearAllBtn = $('#clearAll');
+      const selectAllBtn = $('#selectAll');
+      const markAllCompletedBtn = $('#markAllCompleted');
+      const requestNotifyBtn = $('#requestNotify');
+
+      // drag state
+      let dragSrc = null;
+
+      // ---------- Rendering ----------
+      function render(){
+        renderLists();
+        renderActiveList();
+        save();
+      }
+
+      function renderLists(){
+        listsEl.innerHTML = '';
+        state.lists.forEach(list => {
+          const count = list.tasks.length;
+          const active = list.id === state.activeListId;
+          const div = document.createElement('div');
+          div.className = 'list-item' + (active ? ' active' : '');
+          div.dataset.id = list.id;
+          div.innerHTML = `<div style="flex:1"><strong>${escapeHtml(list.name)}</strong><div class='meta'>${count} task${count!==1?'s':''}</div></div><div style='display:flex;gap:6px'><button data-action='rename'>✎</button><button data-action='delete'>🗑</button></div>`;
+          div.addEventListener('click', (e)=>{
+            if(e.target && e.target.dataset && e.target.dataset.action){
+              const action = e.target.dataset.action;
+              if(action === 'delete') return deleteList(list.id);
+              if(action === 'rename') return renameList(list.id);
+            }
+            state.activeListId = list.id; render();
+          });
+          listsEl.appendChild(div);
+        });
+      }
+
+      function renderActiveList(){
+        const list = getActiveList();
+        if(!list){ currentListTitle.textContent = '(No list)'; currentListMeta.textContent = 'Create a list to start.'; tasksContainer.innerHTML=''; tasksCount.textContent='0 tasks'; return; }
+        currentListTitle.textContent = list.name;
+        currentListMeta.textContent = `${list.tasks.length} tasks • created ${new Date(list.createdAt).toLocaleString()}`;
+
+        // filter, search, sort
+        let tasks = list.tasks.slice();
+        // custom manual order by 'order' property
+        tasks.sort((a,b)=> (a.order||0) - (b.order||0));
+        // apply sortBy
+        const s = state.sortBy || 'custom';
+        if(s === 'dateAsc') tasks.sort((a,b)=> (a.due||'') > (b.due||'') ? 1 : -1);
+        if(s === 'dateDesc') tasks.sort((a,b)=> (a.due||'') < (b.due||'') ? 1 : -1);
+        if(s === 'priority') tasks.sort((a,b)=> priorityVal(b.priority) - priorityVal(a.priority));
+
+        if(state.filter === 'active') tasks = tasks.filter(t=>!t.completed);
+        if(state.filter === 'completed') tasks = tasks.filter(t=>t.completed);
+        if(state.filter === 'overdue') tasks = tasks.filter(t=> t.due && !t.completed && new Date(t.due) < new Date());
+
+        if(state.search && state.search.trim()){
+          const q = state.search.toLowerCase();
+          tasks = tasks.filter(t=> (t.title||'').toLowerCase().includes(q));
+        }
+
+        tasksContainer.innerHTML = '';
+        if(tasks.length === 0){ tasksContainer.innerHTML = '<div class="small muted">No tasks to show.</div>'; }
+
+        tasks.forEach(task => {
+          const tr = document.createElement('div');
+          tr.className = 'task' + (task.completed ? ' completed' : '');
+          tr.draggable = true;
+          tr.dataset.id = task.id;
+
+          const checkbox = document.createElement('div');
+          checkbox.className = 'checkbox';
+          checkbox.innerHTML = task.completed ? '✔' : '';
+          checkbox.title = 'Mark complete/uncomplete';
+          checkbox.addEventListener('click', ()=> toggleTaskCompleted(list.id, task.id));
+
+          const titleWrap = document.createElement('div');
+          titleWrap.style.display='flex'; titleWrap.style.flexDirection='column';
+          const titleEl = document.createElement('div');
+          titleEl.className = 'title';
+          titleEl.textContent = task.title;
+          titleEl.title = 'Double click to edit';
+          titleEl.addEventListener('dblclick', ()=> editTask(list.id, task.id));
+
+          const metaEl = document.createElement('div');
+          metaEl.className = 'meta';
+          const parts = [];
+          if(task.priority) parts.push(`<span class='pill'>${task.priority}</span>`);
+          if(task.due) {
+            const dueDate = new Date(task.due);
+            const now = new Date();
+            const overdue = !task.completed && dueDate < now;
+            parts.push(`<span class='pill' title='Due date'>${dueDate.toLocaleString()}${overdue? ' • overdue':''}</span>`);
+          }
+          parts.push(`<span class='small muted'>created ${new Date(task.createdAt).toLocaleString()}</span>`);
+          metaEl.innerHTML = parts.join(' ');
+
+          titleWrap.appendChild(titleEl);
+          titleWrap.appendChild(metaEl);
+
+          const actions = document.createElement('div');
+          actions.className = 'actions';
+          const editBtn = document.createElement('button'); editBtn.textContent='Edit'; editBtn.addEventListener('click', ()=> editTask(list.id, task.id));
+          const delBtn = document.createElement('button'); delBtn.textContent='Delete'; delBtn.addEventListener('click', ()=> deleteTask(list.id, task.id));
+          actions.appendChild(editBtn); actions.appendChild(delBtn);
+
+          tr.appendChild(checkbox);
+          tr.appendChild(titleWrap);
+          tr.appendChild(actions);
+
+          // drag events
+          tr.addEventListener('dragstart', (e)=>{
+            dragSrc = task.id; tr.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move';
+          });
+          tr.addEventListener('dragend', ()=>{ dragSrc = null; tr.classList.remove('dragging'); render(); });
+
+          tr.addEventListener('dragover', (e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; });
+          tr.addEventListener('drop', (e)=>{
+            e.preventDefault(); const destId = task.id; if(dragSrc && dragSrc !== destId){ reorderTask(list.id, dragSrc, destId); }
+          });
+
+          tasksContainer.appendChild(tr);
+        });
+
+        tasksCount.textContent = `${list.tasks.length} tasks (${tasks.length} shown)`;
+      }
+
+      // ---------- Actions ----------
+      function addList(name){
+        if(!name || !name.trim()) return alert('List name required');
+        const id = uid('list');
+        state.lists.push({ id, name: name.trim(), tasks:[], createdAt: new Date().toISOString() });
+        state.activeListId = id; render();
+      }
+
+      function deleteList(id){
+        if(!confirm('Delete this list and all its tasks?')) return;
+        const idx = state.lists.findIndex(l=>l.id===id); if(idx===-1) return;
+        state.lists.splice(idx,1);
+        if(state.lists.length) state.activeListId = state.lists[0].id; else state.activeListId = null;
+        render();
+      }
+
+      function renameList(id){
+        const list = state.lists.find(l=>l.id===id); if(!list) return;
+        const nm = prompt('Rename list', list.name); if(nm && nm.trim()){ list.name = nm.trim(); render(); }
+      }
+
+      function addTaskToActive({title, due=null, priority='low'}){
+        const list = getActiveList(); if(!list) return alert('Select or create a list first');
+        const t = { id: uid('task'), title: title.trim(), completed:false, due: due? new Date(due).toISOString():null, priority: priority||'low', createdAt: new Date().toISOString(), order: (list.tasks.length? Math.max(...list.tasks.map(x=>x.order||0))+1 : 1) };
+        list.tasks.push(t); render();
+      }
+
+      function toggleTaskCompleted(listId, taskId){
+        const list = state.lists.find(l=>l.id===listId); if(!list) return;
+        const task = list.tasks.find(t=>t.id===taskId); if(!task) return;
+        task.completed = !task.completed; render();
+      }
+
+      function deleteTask(listId, taskId){
+        const list = state.lists.find(l=>l.id===listId); if(!list) return;
+        const idx = list.tasks.findIndex(t=>t.id===taskId); if(idx===-1) return;
+        if(!confirm('Delete this task?')) return;
+        list.tasks.splice(idx,1); render();
+      }
+
+      function editTask(listId, taskId){
+        const list = state.lists.find(l=>l.id===listId); if(!list) return;
+        const task = list.tasks.find(t=>t.id===taskId); if(!task) return;
+        // prompt based editor (keeps code shorter). Could be replaced by modal.
+        const newTitle = prompt('Edit task title', task.title); if(newTitle===null) return; task.title = newTitle.trim() || task.title;
+        const newDue = prompt('Due date/time (YYYY-MM-DDTHH:MM) — leave blank to clear', task.due ? (new Date(task.due).toISOString().slice(0,16)) : '');
+        if(newDue !== null){ task.due = newDue.trim() ? new Date(newDue).toISOString() : null; }
+        const newPriority = prompt('Priority (low/medium/high)', task.priority || 'low'); if(newPriority!==null) task.priority = ['low','medium','high'].includes(newPriority)? newPriority:task.priority;
+        render();
+      }
+
+      function reorderTask(listId, srcId, destId){
+        const list = state.lists.find(l=>l.id===listId); if(!list) return;
+        const srcIdx = list.tasks.findIndex(t=>t.id===srcId); const destIdx = list.tasks.findIndex(t=>t.id===destId);
+        if(srcIdx===-1 || destIdx===-1) return;
+        const [item] = list.tasks.splice(srcIdx,1);
+        list.tasks.splice(destIdx,0,item);
+        // reassign order values
+        list.tasks.forEach((t,i)=> t.order = i+1);
+        render();
+      }
+
+      function clearCompleted(){ const list = getActiveList(); if(!list) return; list.tasks = list.tasks.filter(t=>!t.completed); render(); }
+      function clearAll(){ if(!confirm('Clear ALL tasks in all lists?')) return; state.lists.forEach(l=> l.tasks = []); render(); }
+      function selectDeselectAll(){ const list = getActiveList(); if(!list) return; const allCompleted = list.tasks.every(t=>t.completed); list.tasks.forEach(t=> t.completed = !allCompleted); render(); }
+      function markAllCompleted(){ const list = getActiveList(); if(!list) return; list.tasks.forEach(t=> t.completed = true); render(); }
+
+      // ---------- Export / Import ----------
+      function exportData(){
+        const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = 'skillcraft_todo_export.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      }
+      function importData(file){
+        const reader = new FileReader();
+        reader.onload = (e)=>{
+          try{ const data = JSON.parse(e.target.result); if(data && data.lists){ state.lists = data.lists; state.activeListId = data.activeListId || (data.lists[0] && data.lists[0].id); render(); alert('Import successful'); } else alert('Invalid file'); } catch(err){ alert('Failed to import: ' + err.message); }
+        };
+        reader.readAsText(file);
+      }
+
+      // ---------- Notifications & Reminders ----------
+      function requestNotificationPermission(){
+        if(!('Notification' in window)) return alert('Notifications not supported in this browser');
+        Notification.requestPermission().then(p=>{ if(p==='granted') alert('Notifications enabled — reminders will show when you open the app'); else alert('Notifications denied'); });
+      }
+
+      function checkDueReminders(){
+        // check all tasks, if due within next minute and not completed show notification
+        const now = new Date();
+        state.lists.forEach(list => {
+          list.tasks.forEach(task => {
+            if(task.due && !task.completed){
+              const due = new Date(task.due);
+              const diffMs = due - now;
+              // notify if due within next 60 seconds or overdue within last 10 seconds
+              if(diffMs <= 60000 && diffMs >= -10000){
+                if(Notification.permission === 'granted'){
+                  new Notification('Task due: ' + task.title, { body: `${list.name} • due ${due.toLocaleString()}` });
+                }
+              }
+            }
+          })
+        })
+      }
+
+      // ---------- Utilities ----------
+      function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+      function priorityVal(p){ return p==='high'?3: p==='medium'?2:1; }
+
+      // ---------- Events ----------
+      addListBtn.addEventListener('click', ()=>{ addList(newListName.value); newListName.value=''; });
+      newListName.addEventListener('keydown', (e)=>{ if(e.key === 'Enter') addListBtn.click(); });
+
+      addTaskBtn.addEventListener('click', ()=>{
+        const title = taskTitle.value; if(!title || !title.trim()) return alert('Task title required');
+        addTaskToActive({ title, due: taskDue.value || null, priority: taskPriority.value });
+        taskTitle.value = ''; taskDue.value = ''; taskPriority.value = 'low';
+      });
+      clearComposer.addEventListener('click', ()=>{ taskTitle.value=''; taskDue.value=''; taskPriority.value='low'; });
+
+      filterStatus.addEventListener('change', (e)=>{ state.filter = e.target.value; render(); });
+      searchInput.addEventListener('input', (e)=>{ state.search = e.target.value; render(); });
+      sortBy.addEventListener('change', (e)=>{ state.sortBy = e.target.value; render(); });
+
+      exportBtn.addEventListener('click', exportData);
+      importBtn.addEventListener('click', ()=> importFile.click());
+      importFile.addEventListener('change', (e)=>{ const f = e.target.files[0]; if(f) importData(f); importFile.value=''; });
+
+      clearCompletedBtn.addEventListener('click', clearCompleted);
+      clearAllBtn.addEventListener('click', clearAll);
+      selectAllBtn.addEventListener('click', selectDeselectAll);
+      markAllCompletedBtn.addEventListener('click', markAllCompleted);
+      requestNotifyBtn.addEventListener('click', requestNotificationPermission);
+
+      // keyboard shortcut: n to focus new task, l to focus new list
+      window.addEventListener('keydown', (e)=>{
+        if(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+        if(e.key === 'n') taskTitle.focus();
+        if(e.key === 'l') newListName.focus();
+      });
+
+      // periodic reminder checker every 15s
+      setInterval(checkDueReminders, 15000);
+
+      // ---------- Init ----------
+      load(); ensureDefault(); render();
+
+      // initial UI wiring for select values
+      filterStatus.value = state.filter; sortBy.value = state.sortBy;
+
+      // If first run, add sample tasks for demo
+      if(state.lists && state.lists.length && state.lists.reduce((s,l)=>s+l.tasks.length,0) === 0){
+        const l = state.lists[0];
+        l.tasks.push({ id: uid('task'), title: 'Welcome! Double-click to edit me', completed:false, due:null, priority:'medium', createdAt:new Date().toISOString(), order:1 });
+        l.tasks.push({ id: uid('task'), title: 'Set a due date to test reminders', completed:false, due:new Date(Date.now()+3600*1000).toISOString(), priority:'low', createdAt:new Date().toISOString(), order:2 });
+        save(); render();
+      }
+
+      // expose for debugging
+      window.SK_TODO = { state, save, load, render };
+    })();
+  </script></body>
+</html>
